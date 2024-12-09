@@ -39,11 +39,11 @@ prompts_dir = script_dir / "prompts"
 # Set up Jinja environment and template loader
 env = Environment(loader=FileSystemLoader(prompts_dir))
 
-legal_assistant_template = env.get_template("legal_assistant.j2")
-legal_assistant_prompt = legal_assistant_template.render({})
+analysis_generator_template = env.get_template("analysis_generator.j2")
+analysis_generator_prompt = analysis_generator_template.render({})
 
-verification_assistant_template = env.get_template("verification_assistant.j2")
-verification_assistant_prompt = verification_assistant_template.render({})
+analysis_reviewer_template = env.get_template("analysis_reviewer.j2")
+analysis_reviewer_prompt = analysis_reviewer_template.render({})
 
 
 lawer_aid = RetrieveUserProxyAgent(
@@ -68,7 +68,7 @@ lawer_aid = RetrieveUserProxyAgent(
 analysis_generator = ConversableAgent(
     name="analysis_generator",
     is_termination_msg=termination_msg,
-    system_message=legal_assistant_prompt,
+    system_message=analysis_generator_prompt,
     llm_config={
         "timeout": 600,
         "cache_seed": 42,
@@ -80,7 +80,7 @@ analysis_generator = ConversableAgent(
 analysis_reviewer = ConversableAgent(
     name="analysis_reviewer",
     # is_termination_msg=termination_msg,
-    system_message=verification_assistant_prompt,
+    system_message=analysis_reviewer_prompt,
     llm_config={
         "timeout": 600,
         "cache_seed": 42,
