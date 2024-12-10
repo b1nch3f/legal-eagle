@@ -17,10 +17,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-def termination_msg(x):
-    return isinstance(x, dict) and "TERMINATE" == str(x.get("content", ""))[-9:].upper()
-
-
 config_list = [{"model": "gpt-4o-mini", "api_key": os.environ["OPENAI_API_KEY"]}]
 
 llm_config = {
@@ -48,10 +44,9 @@ analysis_reviewer_prompt = analysis_reviewer_template.render({})
 
 lawer_aid = RetrieveUserProxyAgent(
     name="Lawer_assistant",
-    is_termination_msg=termination_msg,
     human_input_mode="NEVER",
     default_auto_reply="Reply `TERMINATE` if the task is done.",
-    max_consecutive_auto_reply=3,
+    # max_consecutive_auto_reply=10,
     retrieve_config={
         "task": "qa",
         "docs_path": "D:\\Personal\\data",
@@ -67,8 +62,8 @@ lawer_aid = RetrieveUserProxyAgent(
 
 analysis_generator = ConversableAgent(
     name="analysis_generator",
-    is_termination_msg=termination_msg,
     system_message=analysis_generator_prompt,
+    # max_consecutive_auto_reply=10,
     llm_config={
         "timeout": 600,
         "cache_seed": 42,
@@ -79,8 +74,8 @@ analysis_generator = ConversableAgent(
 
 analysis_reviewer = ConversableAgent(
     name="analysis_reviewer",
-    # is_termination_msg=termination_msg,
     system_message=analysis_reviewer_prompt,
+    # max_consecutive_auto_reply=10,
     llm_config={
         "timeout": 600,
         "cache_seed": 42,
@@ -98,13 +93,23 @@ def _reset_agents():
     analysis_reviewer.reset()
 
 
+# Get the directory of the current script
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Construct the output folder path
+output_folder = os.path.join(script_dir, "output")
+
+# Ensure the output folder exists
+os.makedirs(output_folder, exist_ok=True)
+
+
 def rag_chat():
     _reset_agents()
     groupchat = autogen.GroupChat(
         agents=[lawer_aid, analysis_generator, analysis_reviewer],
         messages=[],
         max_round=12,
-        speaker_selection_method="round_robin",
+        # speaker_selection_method="round_robin",
     )
     manager = autogen.GroupChatManager(groupchat=groupchat, llm_config=llm_config)
 
@@ -117,42 +122,33 @@ def rag_chat():
     )
 
     # print(lawer_aid.chat_messages)
-    analysis = None
-    review = None
+    # analysis = None
+    # review = None
 
-    for val in lawer_aid.chat_messages.values():
-        for item in val:
-            content, name = item["content"], item["name"]
+    analysis_index = 0
+    review_index = 0
+
+    for msg_lst in lawer_aid.chat_messages.values():
+        for msg in msg_lst:
+            content, name = msg["content"], msg["name"]
             if name == "analysis_generator":
-                analysis = content
+                # Saving analysis
+                file_name = f"analysis_{analysis_index}.txt"
+                file_path = os.path.join(output_folder, file_name)
+
+                with open(file_path, "w") as output:
+                    output.write(content)
+
+                analysis_index += 1
             elif name == "analysis_reviewer":
-                review = content
+                # Saving review
+                file_name = f"review_{review_index}.txt"
+                file_path = os.path.join(output_folder, file_name)
 
-    return analysis, review
+                with open(file_path, "w") as output:
+                    output.write(content)
 
-
-analysis, review = rag_chat()
-
-# Get the directory of the current script
-script_dir = os.path.dirname(os.path.abspath(__file__))
-
-# Construct the output folder path
-output_folder = os.path.join(script_dir, "output")
-
-# Ensure the output folder exists
-os.makedirs(output_folder, exist_ok=True)
+                review_index += 1
 
 
-# Saving analysis
-file_name = f"analysis.txt"
-file_path = os.path.join(output_folder, file_name)
-
-with open(file_path, "w") as output:
-    output.write(analysis)
-
-# Saving review
-file_name = f"review.txt"
-file_path = os.path.join(output_folder, file_name)
-
-with open(file_path, "w") as output:
-    output.write(review)
+rag_chat()
