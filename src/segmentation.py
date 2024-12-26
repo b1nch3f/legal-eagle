@@ -129,8 +129,8 @@ if __name__ == "__main__":
     groupchat = autogen.GroupChat(
         agents=[retriever_agent, analysis_generator, analysis_reviewer],
         messages=[],
-        max_round=2,
-        speaker_selection_method="round_robin",
+        max_round=3,
+        # speaker_selection_method="round_robin",
     )
 
     manager = autogen.GroupChatManager(groupchat=groupchat, llm_config=llm_config)
