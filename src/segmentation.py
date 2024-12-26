@@ -58,8 +58,34 @@ output_folder = os.path.join(os.path.dirname(script_dir), "output")
 # Ensure the output folder exists
 os.makedirs(output_folder, exist_ok=True)
 
-human_proxy = ConversableAgent(
-    "human_proxy",
+PROMPT_QA = """Answer user's questions based on the
+context provided by the user.
+
+User's question is: {input_question}
+
+Context is: {input_context}
+"""
+
+
+class RetrieverAgent(ConversableAgent):
+    @staticmethod
+    def message_generator(sender, recipient, context):
+        problem = context.get("problem", "")
+
+        chunks = single_vector_search(problem)
+
+        result = ""
+
+        for i, item in enumerate(chunks, 1):
+            result += f"{i}. {item['chunk']}\n"
+
+        result = PROMPT_QA.format(input_question=problem, input_context=result)
+
+        return result
+
+
+retriever_agent = RetrieverAgent(
+    "retriever_agent",
     llm_config=False,  # no LLM used for human proxy
     human_input_mode="NEVER",  # always ask for human input
 )
@@ -90,7 +116,7 @@ analysis_reviewer = ConversableAgent(
 
 
 def _reset_agents():
-    human_proxy.reset()
+    retriever_agent.reset()
     analysis_generator.reset()
     analysis_reviewer.reset()
 
@@ -100,31 +126,26 @@ if __name__ == "__main__":
 
     PROBLEM = "List all the winning argumnets presented by defense"
 
-    chunks = single_vector_search(PROBLEM)
-
-    prompt = PROBLEM + "\n\n"
-    for i, query in enumerate(chunks, 1):
-        prompt += f"{i}. {query}\n"
-
     groupchat = autogen.GroupChat(
-        agents=[human_proxy, analysis_generator, analysis_reviewer],
+        agents=[retriever_agent, analysis_generator, analysis_reviewer],
         messages=[],
         max_round=2,
-        # speaker_selection_method="round_robin",
+        speaker_selection_method="round_robin",
     )
 
     manager = autogen.GroupChatManager(groupchat=groupchat, llm_config=llm_config)
 
-    # Start chatting with boss_aid as this is the user proxy agent.
-    human_proxy.initiate_chat(
+    # initial chat
+    retriever_agent.initiate_chat(
         manager,
-        message=prompt,
+        message=retriever_agent.message_generator,
+        problem=PROBLEM,
     )
 
     analysis_index = 0
     review_index = 0
 
-    for msg_lst in human_proxy.chat_messages.values():
+    for msg_lst in retriever_agent.chat_messages.values():
         for msg in msg_lst:
             content, name = msg["content"], msg["name"]
             if name == "analysis_generator":
