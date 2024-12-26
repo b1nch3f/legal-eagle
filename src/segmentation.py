@@ -67,24 +67,22 @@ Context is: {input_context}
 """
 
 
-class RetrieverAgent(ConversableAgent):
-    @staticmethod
-    def message_generator(sender, recipient, context):
-        problem = context.get("problem", "")
+def vector_search_message_generator(sender, recipient, context):
+    problem = context.get("problem", "")
 
-        chunks = single_vector_search(problem)
+    chunks = single_vector_search(problem)
 
-        result = ""
+    result = ""
 
-        for i, item in enumerate(chunks, 1):
-            result += f"{i}. {item['chunk']}\n"
+    for i, item in enumerate(chunks, 1):
+        result += f"{i}. {item['chunk']}\n"
 
-        result = PROMPT_QA.format(input_question=problem, input_context=result)
+    result = PROMPT_QA.format(input_question=problem, input_context=result)
 
-        return result
+    return result
 
 
-retriever_agent = RetrieverAgent(
+retriever_agent = ConversableAgent(
     "retriever_agent",
     llm_config=False,  # no LLM used for human proxy
     human_input_mode="NEVER",  # always ask for human input
@@ -138,7 +136,7 @@ if __name__ == "__main__":
     # initial chat
     retriever_agent.initiate_chat(
         manager,
-        message=retriever_agent.message_generator,
+        message=vector_search_message_generator,
         problem=PROBLEM,
     )
 
